@@ -1,8 +1,10 @@
 'use server'
 
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { getClientIp, hashClientIp } from '@/lib/request-ip'
 import { ensureUniqueSlug } from '@/lib/slug'
 
 export type RegisterState = { error?: string }
@@ -24,6 +26,29 @@ export async function registerTrial(
   }
 
   const admin = createAdminClient()
+
+  const reqHeaders = await headers()
+  const ip = getClientIp(reqHeaders)
+  if (!ip) {
+    return {
+      error:
+        'No pudimos verificar tu red para activar la prueba gratis. Intenta de nuevo o contacta soporte.',
+    }
+  }
+
+  const ipHash = hashClientIp(ip)
+  const { data: existingTrial } = await admin
+    .from('trial_ip_claims')
+    .select('id, first_email, created_at')
+    .eq('ip_hash', ipHash)
+    .maybeSingle()
+
+  if (existingTrial) {
+    return {
+      error:
+        'Esta red ya uso una prueba gratis. Si ya vencio, debes renovar tu suscripcion. Si necesitas ayuda, contacta al owner.',
+    }
+  }
 
   const slug = await ensureUniqueSlug(companyName, async (candidate) => {
     const { data } = await admin
@@ -67,6 +92,22 @@ export async function registerTrial(
     await admin.auth.admin.deleteUser(userRes.user.id)
     await admin.from('companies').delete().eq('id', company.id)
     return { error: `No se pudo completar tu registro: ${profileErr.message}` }
+  }
+
+  const { error: claimErr } = await admin.from('trial_ip_claims').insert({
+    ip_hash: ipHash,
+    first_email: email,
+    first_company_name: companyName,
+    company_id: company.id,
+  })
+
+  if (claimErr) {
+    await admin.auth.admin.deleteUser(userRes.user.id)
+    await admin.from('companies').delete().eq('id', company.id)
+    return {
+      error:
+        'No se pudo activar la prueba gratis para esta red. Si ya usaste una prueba, debes renovar la suscripcion.',
+    }
   }
 
   const supabase = await createClient()

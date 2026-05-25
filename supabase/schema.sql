@@ -42,6 +42,18 @@ create table if not exists public.profiles (
   created_at  timestamptz not null default now()
 );
 
+-- Tracks free-trial claims by hashed IP to prevent unlimited retries
+-- with different emails from the same network.
+create table if not exists public.trial_ip_claims (
+  id                 uuid primary key default gen_random_uuid(),
+  ip_hash            text not null unique,
+  first_email        text,
+  first_company_name text,
+  company_id         uuid references public.companies(id) on delete set null,
+  created_at         timestamptz not null default now()
+);
+create index if not exists idx_trial_ip_claims_created on public.trial_ip_claims(created_at desc);
+
 create table if not exists public.products (
   id          uuid primary key default gen_random_uuid(),
   company_id  uuid not null references public.companies(id) on delete cascade,
@@ -170,6 +182,16 @@ create table if not exists public.payments (
   amount_usd   numeric(10,2) not null,
   amount_bs    numeric(14,2),
   dolar_rate   numeric(12,4),
+  declared_amount numeric(14,2),
+  expected_amount numeric(14,2),
+  expected_currency text,                           -- 'USD' | 'Bs'
+  ai_is_payment boolean,
+  ai_method    text,                                -- 'binance' | 'pagomovil' | 'transferencia' | 'desconocido'
+  ai_amount    numeric(14,2),
+  ai_currency  text,                                -- 'USD' | 'Bs' | 'desconocido'
+  ai_reason    text,
+  ai_method_match boolean,
+  ai_amount_match boolean,
   method       text not null,                       -- 'binance' | 'pagomovil' | 'transferencia'
   reference    text,
   proof_url    text,
@@ -182,7 +204,25 @@ create table if not exists public.payments (
 create index if not exists idx_payments_created on public.payments(created_at desc);
 -- For existing databases:
 alter table public.payments add column if not exists company_id uuid references public.companies(id) on delete set null;
+alter table public.payments add column if not exists declared_amount numeric(14,2);
+alter table public.payments add column if not exists expected_amount numeric(14,2);
+alter table public.payments add column if not exists expected_currency text;
+alter table public.payments add column if not exists ai_is_payment boolean;
+alter table public.payments add column if not exists ai_method text;
+alter table public.payments add column if not exists ai_amount numeric(14,2);
+alter table public.payments add column if not exists ai_currency text;
+alter table public.payments add column if not exists ai_reason text;
+alter table public.payments add column if not exists ai_method_match boolean;
+alter table public.payments add column if not exists ai_amount_match boolean;
 create index if not exists idx_payments_company on public.payments(company_id);
+
+alter table public.trial_ip_claims enable row level security;
+drop policy if exists "trial_ip_claims_owner_read" on public.trial_ip_claims;
+create policy "trial_ip_claims_owner_read" on public.trial_ip_claims
+  for select using (public.is_owner());
+
+grant all on public.trial_ip_claims to service_role;
+grant select on public.trial_ip_claims to authenticated;
 
 alter table public.payments enable row level security;
 -- Only the owner can read/update. Inserts happen server-side via service role.

@@ -19,11 +19,22 @@ interface Props {
 
 export default function CategoryManagerModal({ categories, products, onClose }: Props) {
   const root = useRef<HTMLDivElement>(null)
+  const nameInputRef = useRef<HTMLInputElement>(null)
+  const createFormRef = useRef<HTMLFormElement>(null)
   const [search, setSearch] = useState('')
 
   useGSAP(
     () => {
-      gsap.from('.catm-panel', { y: 24, scale: 0.97, opacity: 0, duration: 0.3, ease: 'back.out(1.4)' })
+      gsap.from('.catm-panel', {
+        y: 24,
+        scale: 0.97,
+        opacity: 0,
+        duration: 0.3,
+        ease: 'back.out(1.4)',
+        onComplete: () => {
+          nameInputRef.current?.focus()
+        },
+      })
     },
     { scope: root }
   )
@@ -67,12 +78,16 @@ export default function CategoryManagerModal({ categories, products, onClose }: 
           <section>
             <h3 className="mb-2 font-bold text-gray-800">Tus categorías</h3>
             <form
+              ref={createFormRef}
               action={async (fd) => {
                 await toast.promise(createCategory(fd), {
                   loading: 'Creando categoría…',
                   success: 'Categoría creada',
                   error: 'No se pudo crear la categoría',
                 })
+                createFormRef.current?.reset()
+                nameInputRef.current?.focus()
+                nameInputRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
               }}
               className="mb-3 flex gap-2"
             >
@@ -84,6 +99,7 @@ export default function CategoryManagerModal({ categories, products, onClose }: 
                 className="w-14 rounded-lg border border-gray-300 text-center text-xl outline-none focus:ring-2 focus:ring-[#f06292]"
               />
               <input
+                ref={nameInputRef}
                 name="name"
                 required
                 placeholder="Ej: Chocolates"

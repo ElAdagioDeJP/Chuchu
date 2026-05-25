@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import gsap from 'gsap'
 import { useGSAP } from '@gsap/react'
@@ -21,20 +21,51 @@ interface Props {
 export default function VentasCombos({ products, combos }: Props) {
   const [showCreator, setShowCreator] = useState(false)
   const [editing, setEditing] = useState<ComboView | null>(null)
+  const [search, setSearch] = useState('')
   const root = useRef<HTMLDivElement>(null)
   // Inactive products are hidden from selling and combos.
   const activeProducts = products.filter((p) => p.active)
+
+  const term = search.trim().toLowerCase()
+  const filteredActiveProducts = useMemo(
+    () =>
+      !term
+        ? activeProducts
+        : activeProducts.filter((p) => `${p.name} ${p.emoji ?? ''}`.toLowerCase().includes(term)),
+    [activeProducts, term]
+  )
+
+  const filteredCombos = useMemo(
+    () =>
+      !term
+        ? combos
+        : combos.filter((combo) => {
+            const items = combo.items.map((i) => i.name).join(' ')
+            return `${combo.name} ${items}`.toLowerCase().includes(term)
+          }),
+    [combos, term]
+  )
 
   useGSAP(
     () => {
       gsap.from('.vc-product', { y: 20, opacity: 0, duration: 0.4, stagger: 0.05, ease: 'power2.out' })
       gsap.from('.vc-combo', { x: -20, opacity: 0, duration: 0.4, stagger: 0.08, delay: 0.15, ease: 'power2.out' })
     },
-    { scope: root }
+    { scope: root, dependencies: [filteredActiveProducts.length, filteredCombos.length] }
   )
 
   return (
     <div ref={root} className="mx-auto max-w-7xl">
+      <div className="mb-5">
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="🔍 Buscar en venta rápida y combos (producto o combo)..."
+          className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#f06292]"
+          aria-label="Buscar productos y combos"
+        />
+      </div>
+
       {/* Quick sell */}
       <section className="mb-12">
         <h2 className="mb-4 flex items-center gap-2 text-xl font-bold text-gray-800">
@@ -42,13 +73,15 @@ export default function VentasCombos({ products, combos }: Props) {
           Venta Rápida
         </h2>
 
-        {activeProducts.length === 0 ? (
+        {filteredActiveProducts.length === 0 ? (
           <p className="rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 py-10 text-center text-gray-400">
-            Sin productos activos. Agrégalos o actívalos en Inventario 📦
+            {activeProducts.length === 0
+              ? 'Sin productos activos. Agrégalos o actívalos en Inventario 📦'
+              : 'No hay productos que coincidan con tu búsqueda.'}
           </p>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {activeProducts.map((p) => (
+            {filteredActiveProducts.map((p) => (
               <div
                 key={p.id}
                 className="vc-product rounded-xl border border-gray-700 bg-[#2d2d2d] p-4 shadow-md transition-shadow hover:shadow-xl"
@@ -114,20 +147,26 @@ export default function VentasCombos({ products, combos }: Props) {
           </button>
         </div>
 
-        {combos.length === 0 ? (
+        {filteredCombos.length === 0 ? (
           <div className="rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 py-12 text-center">
-            <p className="text-gray-400">No hay combos activos</p>
-            <button
-              type="button"
-              onClick={() => setShowCreator(true)}
-              className="mt-3 font-medium text-[#f06292]"
-            >
-              Crear el primer combo ✨
-            </button>
+            <p className="text-gray-400">
+              {combos.length === 0
+                ? 'No hay combos activos'
+                : 'No hay combos que coincidan con tu búsqueda'}
+            </p>
+            {combos.length === 0 && (
+              <button
+                type="button"
+                onClick={() => setShowCreator(true)}
+                className="mt-3 font-medium text-[#f06292]"
+              >
+                Crear el primer combo ✨
+              </button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            {combos.map((combo) => {
+            {filteredCombos.map((combo) => {
               const discount =
                 combo.original_price > combo.price_offer
                   ? Math.round((1 - combo.price_offer / combo.original_price) * 100)

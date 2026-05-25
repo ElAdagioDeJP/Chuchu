@@ -17,6 +17,16 @@ export interface Payment {
   amount_usd: number
   amount_bs: number | null
   dolar_rate: number | null
+  declared_amount: number | null
+  expected_amount: number | null
+  expected_currency: 'USD' | 'Bs' | null
+  ai_is_payment: boolean | null
+  ai_method: PaymentMethod | 'desconocido' | null
+  ai_amount: number | null
+  ai_currency: 'USD' | 'Bs' | 'desconocido' | null
+  ai_reason: string | null
+  ai_method_match: boolean | null
+  ai_amount_match: boolean | null
   method: PaymentMethod
   reference: string | null
   proof_url: string | null

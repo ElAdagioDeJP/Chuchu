@@ -62,6 +62,11 @@ export default function Checkout({ plan, rate }: { plan: Plan; rate: number }) {
   const [proofName, setProofName] = useState<string | null>(null)
   const info = PLANS[plan]
   const amountBs = rate > 0 ? usdToBs(info.priceUsd, rate) : 0
+  const amountLabel = method === 'binance' ? 'Monto enviado (USD)' : 'Monto enviado (Bs)'
+  const amountPlaceholder =
+    method === 'binance'
+      ? `Ej: ${info.priceUsd}`
+      : `Ej: ${amountBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`
 
   const [state, formAction] = useActionState(submitPayment, {} as CheckoutState)
 
@@ -211,7 +216,18 @@ export default function Checkout({ plan, rate }: { plan: Plan; rate: number }) {
               placeholder="Número de referencia"
               className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 outline-none placeholder:text-white/30 focus:border-[#f06292]"
             />
+            <input
+              name="paid_amount"
+              required
+              inputMode="decimal"
+              placeholder={amountPlaceholder}
+              className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 outline-none placeholder:text-white/30 focus:border-[#f06292]"
+            />
           </div>
+
+          <p className="text-xs text-white/55">
+            {amountLabel}: usa el monto exacto o muy cercano al que se muestra arriba segun la tasa actual.
+          </p>
 
           <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed border-white/15 bg-white/5 p-4 transition hover:border-[#f06292]/50">
             <span className="text-2xl">📷</span>
@@ -236,7 +252,7 @@ export default function Checkout({ plan, rate }: { plan: Plan; rate: number }) {
 
           <PayButton />
           <p className="text-center text-xs text-white/40">
-            Validamos tu comprobante con IA antes de activarte.
+            La IA valida tipo de pago y monto. Si no coincide con el metodo seleccionado, no se enviara.
           </p>
         </form>
       </div>

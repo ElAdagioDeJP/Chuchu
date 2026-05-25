@@ -118,6 +118,21 @@ export default function PaymentsView({ payments }: { payments: Payment[] }) {
                             Bs {Number(p.amount_bs).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
                           </p>
                         )}
+                        {p.declared_amount != null && (
+                          <p className="text-xs text-gray-500">
+                            Declarado:{' '}
+                            {p.expected_currency === 'USD'
+                              ? `$${Number(p.declared_amount).toFixed(2)}`
+                              : `Bs ${Number(p.declared_amount).toLocaleString('es-VE', { minimumFractionDigits: 2 })}`}
+                          </p>
+                        )}
+                        {p.ai_method && (
+                          <p className="mt-1 text-xs text-gray-500">
+                            IA: {p.ai_method}
+                            {p.ai_method_match === false ? ' (no coincide)' : ''}
+                          </p>
+                        )}
+                        {p.ai_reason && <p className="text-xs text-amber-600">{p.ai_reason}</p>}
                       </td>
                       <td className="p-3">
                         <code className="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700">

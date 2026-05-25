@@ -6,9 +6,10 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { fetchProductImage } from '@/lib/productImage'
 import { getDolarParalelo, usdToBs } from '@/lib/dolar'
 import { isPaymentProof } from '@/lib/gemini'
+import { parseMoneyInput, validatePaymentProof } from '@/lib/payment-validation'
 import { sendPaymentTelegram } from '@/lib/telegram'
 import { PLANS, METHOD_LABEL } from '@/lib/plans'
-import type { Plan, PaymentMethod, PaymentStatus } from '@/lib/types'
+import type { Plan, PaymentMethod } from '@/lib/types'
 
 function parseRate(formData: FormData) {
   const raw = String(formData.get('rate_mode') || '').trim()
@@ -380,11 +381,14 @@ export async function submitSubscriptionPayment(
   const method = String(formData.get('method') || '') as PaymentMethod
   const reference = String(formData.get('reference') || '').trim()
   const phone = String(formData.get('phone') || '').trim()
+  const paidAmountRaw = String(formData.get('paid_amount') || '').trim()
   const proof = formData.get('proof') as File | null
 
   if (!PLANS[plan]) return { error: 'Plan inválido.' }
   if (!PAY_METHODS.includes(method)) return { error: 'Método de pago inválido.' }
   if (!reference) return { error: 'Indica el número de referencia del pago.' }
+  const paidAmount = parseMoneyInput(paidAmountRaw)
+  if (!paidAmount) return { error: 'Indica el monto pagado con un formato válido.' }
   if (!proof || proof.size === 0) return { error: 'Sube la captura de tu pago.' }
   if (!proof.type.startsWith('image/')) return { error: 'El comprobante debe ser una imagen.' }
   if (proof.size > 8 * 1024 * 1024) return { error: 'La imagen es muy grande (máx 8MB).' }
@@ -404,8 +408,22 @@ export async function submitSubscriptionPayment(
   const bytes = await proof.arrayBuffer()
   const base64 = Buffer.from(bytes).toString('base64')
 
+  const amountUsd = PLANS[plan].priceUsd
+  const rate = await getDolarParalelo()
+  const amountBs = rate > 0 ? usdToBs(amountUsd, rate) : null
+
   const check = await isPaymentProof(base64, proof.type)
-  const status: PaymentStatus = check.ok ? 'pending' : 'rejected'
+  const validation = validatePaymentProof({
+    method,
+    expectedAmount: method === 'binance' ? amountUsd : amountBs,
+    expectedCurrency: method === 'binance' ? 'USD' : 'Bs',
+    declaredAmount: paidAmount,
+    analysis: check,
+  })
+
+  if (!validation.valid) {
+    return { error: validation.userMessage }
+  }
 
   const admin = createAdminClient()
 
@@ -417,23 +435,29 @@ export async function submitSubscriptionPayment(
   if (upErr) return { error: `No se pudo subir la imagen: ${upErr.message}` }
   const proofUrl = admin.storage.from('payments').getPublicUrl(path).data.publicUrl
 
-  const amountUsd = PLANS[plan].priceUsd
-  const rate = await getDolarParalelo()
-  const amountBs = rate > 0 ? usdToBs(amountUsd, rate) : null
-
   const { error: insErr } = await admin.from('payments').insert({
     company_id: companyId,
     plan,
     amount_usd: amountUsd,
     amount_bs: amountBs,
     dolar_rate: rate || null,
+    declared_amount: paidAmount,
+    expected_amount: method === 'binance' ? amountUsd : amountBs,
+    expected_currency: method === 'binance' ? 'USD' : 'Bs',
+    ai_is_payment: check.ok,
+    ai_method: check.method,
+    ai_amount: check.amount,
+    ai_currency: check.currency,
+    ai_reason: check.reason || null,
+    ai_method_match: validation.checks.methodMatch,
+    ai_amount_match: validation.checks.imageAmountMatch,
     method,
     reference,
     proof_url: proofUrl,
     buyer_name: buyerName,
     buyer_email: buyerEmail,
     buyer_phone: phone || null,
-    status,
+    status: 'pending',
   })
   if (insErr) return { error: `No se pudo registrar el pago: ${insErr.message}` }
 
@@ -442,6 +466,11 @@ export async function submitSubscriptionPayment(
       ? `💵 Monto: <b>$${amountUsd} USD</b>`
       : `💵 Monto: <b>$${amountUsd}</b>${amountBs ? ` ≈ <b>Bs ${amountBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</b>` : ''}`
 
+  const declaredLine =
+    method === 'binance'
+      ? `🧾 Monto declarado: <b>$${paidAmount.toFixed(2)} USD</b>`
+      : `🧾 Monto declarado: <b>Bs ${paidAmount.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</b>`
+
   const caption = [
     '<b>🔁 RENOVACIÓN DE SUSCRIPCIÓN</b>',
     '━━━━━━━━━━━━━━━',
@@ -449,11 +478,14 @@ export async function submitSubscriptionPayment(
     `🏷 Plan: <b>${escapeHtml(PLANS[plan].name)}</b>`,
     `💳 Método: <b>${METHOD_LABEL[method]}</b>`,
     bsLine,
+    declaredLine,
     `🔖 Referencia: <code>${escapeHtml(reference)}</code>`,
     buyerEmail ? `✉️ ${escapeHtml(buyerEmail)}` : '',
     phone ? `📱 ${escapeHtml(phone)}` : '',
     `🕒 ${new Date().toLocaleString('es-VE', { timeZone: 'America/Caracas' })}`,
-    `📌 Estado: <b>${status === 'rejected' ? '❌ RECHAZADO por IA' : '🕓 Pendiente'}</b>`,
+    `🤖 IA: <b>${escapeHtml(check.method)}</b>${check.amount ? ` · ${check.currency} ${check.amount}` : ''}`,
+    check.reason ? `🧠 Nota IA: ${escapeHtml(check.reason)}` : '',
+    '📌 Estado: <b>🕓 Pendiente</b>',
     '',
     '⚠️ <i>Valida el pago en el panel para sumar 30 días a la empresa.</i>',
   ]
