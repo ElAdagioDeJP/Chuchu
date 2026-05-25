@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState, useRef } from 'react'
+import Link from 'next/link'
 import { useFormStatus } from 'react-dom'
 import Image from 'next/image'
 import gsap from 'gsap'
@@ -140,6 +141,12 @@ export default function LoginPage() {
 
         <p className="mt-6 text-center text-xs text-gray-400">
           ✨ Chuchu Smart Menu · Multi-tenant
+        </p>
+        <p className="mt-2 text-center text-sm text-gray-500">
+          ¿Eres nuevo?{' '}
+          <Link href="/registro" className="font-semibold text-[#8e44ad] hover:underline">
+            Activa tu prueba gratis
+          </Link>
         </p>
       </div>
     </div>

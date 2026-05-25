@@ -3,6 +3,7 @@
 import { useRef } from 'react'
 import gsap from 'gsap'
 import { useGSAP } from '@gsap/react'
+import toast from 'react-hot-toast'
 import { METHOD_LABEL, PLANS } from '@/lib/plans'
 import type { Payment, PaymentStatus } from '@/lib/types'
 import { setPaymentStatus } from './actions'
@@ -46,7 +47,7 @@ export default function PaymentsView({ payments }: { payments: Payment[] }) {
       <div className="pay-head flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-gray-800">Pagos</h1>
-          <p className="text-gray-500">Comprobantes enviados desde la landing.</p>
+          <p className="text-gray-500">Comprobantes de landing y renovaciones desde el panel admin.</p>
         </div>
         <div className="flex gap-3">
           <div className="rounded-2xl bg-gradient-to-r from-[#8e44ad] to-[#d81b60] px-5 py-3 text-white shadow-lg">
@@ -102,6 +103,11 @@ export default function PaymentsView({ payments }: { payments: Payment[] }) {
                         <p className="font-medium text-gray-800">{p.buyer_name ?? '—'}</p>
                         <p className="text-xs text-gray-400">{p.buyer_email}</p>
                         {p.buyer_phone && <p className="text-xs text-gray-400">{p.buyer_phone}</p>}
+                        {p.companies?.name && (
+                          <p className="mt-1 text-xs font-medium text-[#8e44ad]">
+                            Empresa: {p.companies.name}
+                          </p>
+                        )}
                       </td>
                       <td className="p-3 text-gray-700">{PLANS[p.plan]?.name ?? p.plan}</td>
                       <td className="p-3 text-gray-700">{METHOD_LABEL[p.method] ?? p.method}</td>
@@ -127,7 +133,15 @@ export default function PaymentsView({ payments }: { payments: Payment[] }) {
                       <td className="p-3">
                         <div className="flex justify-end gap-1">
                           {p.status !== 'validated' && (
-                            <form action={setPaymentStatus}>
+                            <form
+                              action={async (fd) => {
+                                await toast.promise(setPaymentStatus(fd), {
+                                  loading: 'Validando pago…',
+                                  success: 'Pago validado (+30 días aplicados)',
+                                  error: 'No se pudo validar el pago',
+                                })
+                              }}
+                            >
                               <input type="hidden" name="id" value={p.id} />
                               <input type="hidden" name="status" value="validated" />
                               <button
@@ -139,7 +153,15 @@ export default function PaymentsView({ payments }: { payments: Payment[] }) {
                             </form>
                           )}
                           {p.status !== 'rejected' && (
-                            <form action={setPaymentStatus}>
+                            <form
+                              action={async (fd) => {
+                                await toast.promise(setPaymentStatus(fd), {
+                                  loading: 'Marcando pago como rechazado…',
+                                  success: 'Pago rechazado',
+                                  error: 'No se pudo actualizar el pago',
+                                })
+                              }}
+                            >
                               <input type="hidden" name="id" value={p.id} />
                               <input type="hidden" name="status" value="rejected" />
                               <button

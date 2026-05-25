@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Image from 'next/image'
+import toast from 'react-hot-toast'
 import { updateCompany } from '../actions'
 import type { Company, RateMode } from '@/lib/types'
 import SubmitButton from './SubmitButton'
@@ -17,7 +18,16 @@ export default function Ajustes({ company }: { company: Company }) {
       <h1 className="mb-2 text-2xl font-bold text-gray-800">⚙️ Ajustes</h1>
       <p className="mb-6 text-gray-500">Personaliza tu marca y obtén la URL de tu pantalla.</p>
 
-      <form action={updateCompany} className="space-y-6">
+      <form
+        action={async (fd) => {
+          await toast.promise(updateCompany(fd), {
+            loading: 'Guardando ajustes…',
+            success: 'Ajustes guardados',
+            error: 'No se pudieron guardar los ajustes',
+          })
+        }}
+        className="space-y-6"
+      >
         <div className="rounded-xl border border-gray-200 bg-white p-6">
           <h3 className="mb-4 font-bold text-gray-800">🏪 Tu empresa</h3>
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
@@ -112,12 +122,15 @@ export default function Ajustes({ company }: { company: Company }) {
             >
               Abrir pantalla
             </a>
-            <button
-              type="button"
-              onClick={() => navigator.clipboard?.writeText(displayUrl)}
-              className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-200"
-            >
-              Copiar URL
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard?.writeText(displayUrl)
+                  toast.success('URL copiada')
+                }}
+                className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-200"
+              >
+                Copiar URL
             </button>
           </div>
           <p className="mt-2 text-xs text-gray-400">

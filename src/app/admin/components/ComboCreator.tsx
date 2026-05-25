@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from 'react'
 import gsap from 'gsap'
 import { useGSAP } from '@gsap/react'
+import toast from 'react-hot-toast'
 import { createCombo, updateCombo } from '../actions'
 import type { ProductWithVelocity } from '@/lib/types'
 import SubmitButton from './SubmitButton'
@@ -92,8 +93,19 @@ export default function ComboCreator({
 
         <form
           action={async (fd) => {
-            if (editId) await updateCombo(fd)
-            else await createCombo(fd)
+            if (editId) {
+              await toast.promise(updateCombo(fd), {
+                loading: 'Guardando combo…',
+                success: 'Combo actualizado',
+                error: 'No se pudo actualizar el combo',
+              })
+            } else {
+              await toast.promise(createCombo(fd), {
+                loading: 'Creando combo…',
+                success: 'Combo creado',
+                error: 'No se pudo crear el combo',
+              })
+            }
             onClose()
           }}
           className="flex min-h-0 flex-1 flex-col"

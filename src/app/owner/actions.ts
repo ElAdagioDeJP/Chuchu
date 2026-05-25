@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { ensureUniqueSlug } from '@/lib/slug'
 
 async function assertOwner() {
   const supabase = await createClient()
@@ -16,17 +17,6 @@ async function assertOwner() {
     .eq('id', user.id)
     .single()
   if (profile?.role !== 'owner') throw new Error('Acceso denegado')
-}
-
-function slugify(name: string) {
-  return name
-    .toLowerCase()
-    .normalize('NFD')
-    // strip combining diacritical marks (U+0300–U+036F)
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '')
-    .slice(0, 40)
 }
 
 export type OwnerActionState = { error?: string; success?: string }
@@ -55,14 +45,14 @@ export async function createCompany(
 
   const admin = createAdminClient()
 
-  // Unique slug
-  let slug = slugify(name) || 'empresa'
-  const { data: existing } = await admin
-    .from('companies')
-    .select('id')
-    .eq('slug', slug)
-    .maybeSingle()
-  if (existing) slug = `${slug}-${Math.random().toString(36).slice(2, 6)}`
+  const slug = await ensureUniqueSlug(name, async (candidate) => {
+    const { data } = await admin
+      .from('companies')
+      .select('id')
+      .eq('slug', candidate)
+      .maybeSingle()
+    return Boolean(data)
+  })
 
   // Upload logo (optional)
   let logo_url: string | null = null

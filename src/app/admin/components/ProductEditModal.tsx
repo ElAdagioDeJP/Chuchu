@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react'
 import gsap from 'gsap'
 import { useGSAP } from '@gsap/react'
+import toast from 'react-hot-toast'
 import { updateProduct } from '../actions'
 import type { Category, Company, Product, RateMode } from '@/lib/types'
 import { RATE_LABEL } from '@/lib/rates'
@@ -19,12 +20,23 @@ interface Props {
 
 export default function ProductEditModal({ product, categories, company, onClose }: Props) {
   const root = useRef<HTMLDivElement>(null)
+  const panel = useRef<HTMLDivElement>(null)
   const [preview, setPreview] = useState<string | null>(product.image_url)
   const [rateMode, setRateMode] = useState<'' | RateMode>(product.rate_mode ?? '')
 
   useGSAP(
     () => {
-      gsap.from('.pem-panel', { y: 24, scale: 0.96, opacity: 0, duration: 0.3, ease: 'back.out(1.5)' })
+      gsap.from('.pem-panel', {
+        y: 24,
+        scale: 0.96,
+        opacity: 0,
+        duration: 0.3,
+        ease: 'back.out(1.5)',
+        onComplete: () => {
+          panel.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+          panel.current?.focus()
+        },
+      })
     },
     { scope: root }
   )
@@ -36,8 +48,13 @@ export default function ProductEditModal({ product, categories, company, onClose
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
     >
       <div
+        ref={panel}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Editar producto"
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
-        className="pem-panel max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-2xl"
+        className="pem-panel max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-2xl outline-none focus:ring-2 focus:ring-[#8e44ad]/40"
       >
         <div className="flex items-center justify-between border-b border-gray-100 p-5">
           <h2 className="text-xl font-bold text-gray-800">✏️ Editar producto</h2>
@@ -48,7 +65,11 @@ export default function ProductEditModal({ product, categories, company, onClose
 
         <form
           action={async (fd) => {
-            await updateProduct(fd)
+            await toast.promise(updateProduct(fd), {
+              loading: 'Guardando cambios…',
+              success: 'Producto actualizado',
+              error: 'No se pudo actualizar el producto',
+            })
             onClose()
           }}
           className="space-y-4 p-5"

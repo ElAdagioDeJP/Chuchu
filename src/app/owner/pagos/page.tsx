@@ -14,7 +14,7 @@ export default async function PagosPage() {
   const supabase = await createClient()
   const { data } = await supabase
     .from('payments')
-    .select('*')
+    .select('*, companies(name, slug, paid_until)')
     .order('created_at', { ascending: false })
 
   return <PaymentsView payments={(data ?? []) as Payment[]} />

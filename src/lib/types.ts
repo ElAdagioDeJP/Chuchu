@@ -12,6 +12,7 @@ export type PaymentStatus = 'pending' | 'validated' | 'rejected'
 
 export interface Payment {
   id: string
+  company_id: string | null
   plan: Plan
   amount_usd: number
   amount_bs: number | null
@@ -24,6 +25,11 @@ export interface Payment {
   buyer_phone: string | null
   status: PaymentStatus
   created_at: string
+  companies?: {
+    name: string
+    slug: string
+    paid_until: string | null
+  } | null
 }
 
 export interface Company {
@@ -34,6 +40,7 @@ export interface Company {
   active: boolean
   rate_mode: RateMode
   custom_rate: number | null
+  paid_until: string | null // ISO; null = never paid. Drives subscription access.
   created_at: string
 }
 

@@ -4,13 +4,12 @@ import { useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import gsap from 'gsap'
 import { useGSAP } from '@gsap/react'
+import toast from 'react-hot-toast'
 import {
   addProduct,
   updateStock,
   deleteProduct,
   toggleProductActive,
-  createCategory,
-  deleteCategory,
 } from '../actions'
 import type {
   Category,
@@ -22,6 +21,8 @@ import type {
 import { type Rates, convertPrice, formatConverted, resolveRate, RATE_LABEL } from '@/lib/rates'
 import SubmitButton from './SubmitButton'
 import ProductEditModal from './ProductEditModal'
+import CategoryManagerModal from './CategoryManagerModal'
+import { confirmToast } from '@/lib/confirmToast'
 
 gsap.registerPlugin(useGSAP)
 
@@ -55,7 +56,7 @@ export default function Inventario({ products, company, rates, categories }: Pro
   const [preview, setPreview] = useState<string | null>(null)
   const [rateMode, setRateMode] = useState<'' | RateMode>('')
   const [editing, setEditing] = useState<ProductWithVelocity | null>(null)
-  const [showCats, setShowCats] = useState(false)
+  const [showCategoryModal, setShowCategoryModal] = useState(false)
 
   // Filters
   const [q, setQ] = useState('')
@@ -112,76 +113,17 @@ export default function Inventario({ products, company, rates, categories }: Pro
           <h1 className="mb-1 text-2xl font-bold text-gray-800">📦 Inventario</h1>
           <p className="text-gray-500">Busca, filtra, edita y organiza tus productos.</p>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowCats((s) => !s)}
-          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-100"
-        >
-          🏷️ Categorías ({categories.length})
-        </button>
       </div>
-
-      {/* Category manager */}
-      {showCats && (
-        <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <h2 className="mb-3 font-bold text-gray-800">Tus categorías</h2>
-          <form
-            action={createCategory}
-            className="mb-4 flex flex-wrap gap-2"
-          >
-            <input
-              name="emoji"
-              maxLength={2}
-              defaultValue="🏷️"
-              aria-label="Emoji categoría"
-              className="w-14 rounded-lg border border-gray-300 text-center text-xl outline-none focus:ring-2 focus:ring-[#f06292]"
-            />
-            <input
-              name="name"
-              required
-              placeholder="Nueva categoría (ej: Chocolates)"
-              className={`${inputCls} flex-1`}
-            />
-            <SubmitButton
-              pendingText="…"
-              className="rounded-lg bg-[#8e44ad] px-4 py-2 text-sm font-semibold text-white hover:bg-[#7d3c9d]"
-            >
-              + Crear
-            </SubmitButton>
-          </form>
-          <div className="flex flex-wrap gap-2">
-            {categories.length === 0 && (
-              <p className="text-sm text-gray-400">Aún no tienes categorías.</p>
-            )}
-            {categories.map((c) => (
-              <span
-                key={c.id}
-                className="flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1.5 text-sm text-gray-700"
-              >
-                {c.emoji} {c.name}
-                <form
-                  action={deleteCategory}
-                  onSubmit={(e) => {
-                    if (!confirm(`¿Eliminar la categoría "${c.name}"? Los productos quedan sin categoría.`))
-                      e.preventDefault()
-                  }}
-                >
-                  <input type="hidden" name="id" value={c.id} />
-                  <button type="submit" className="text-red-400 hover:text-red-600">
-                    ✕
-                  </button>
-                </form>
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Add product card */}
       <form
         ref={formRef}
         action={async (fd) => {
-          await addProduct(fd)
+          await toast.promise(addProduct(fd), {
+            loading: 'Creando producto…',
+            success: 'Producto creado',
+            error: 'No se pudo crear el producto',
+          })
           formRef.current?.reset()
           setPreview(null)
           setRateMode('')
@@ -232,6 +174,15 @@ export default function Inventario({ products, company, rates, categories }: Pro
 
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             <div className="col-span-2 sm:col-span-4">
+              <button
+                type="button"
+                onClick={() => setShowCategoryModal(true)}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-100"
+              >
+                🏷️ Crear categorías ({categories.length})
+              </button>
+            </div>
+            <div className="col-span-2 sm:col-span-4">
               <label className="mb-1 block text-xs font-semibold text-gray-600">Nombre</label>
               <input name="name" required placeholder="Ej: Chocolate Savoy" className={`${inputCls} w-full`} />
             </div>
@@ -248,7 +199,7 @@ export default function Inventario({ products, company, rates, categories }: Pro
               <input name="expires_at" type="date" aria-label="Vencimiento" className={`${inputCls} w-full text-gray-600`} />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold text-gray-600">Categoría</label>
+              <label className="mb-1 block text-xs font-semibold text-gray-600">Asignar categoría</label>
               <select name="category_id" aria-label="Categoría" className={`${inputCls} w-full text-gray-600`}>
                 <option value="">Sin categoría</option>
                 {categories.map((c) => (
@@ -389,7 +340,16 @@ export default function Inventario({ products, company, rates, categories }: Pro
                       <p className="text-xs text-gray-400">{formatConverted(conv)}</p>
                     </td>
                     <td className="p-4">
-                      <form action={updateStock} className="flex items-center gap-2">
+                      <form
+                        action={async (fd) => {
+                          await toast.promise(updateStock(fd), {
+                            loading: `Actualizando stock de ${p.name}…`,
+                            success: 'Stock actualizado',
+                            error: 'No se pudo actualizar el stock',
+                          })
+                        }}
+                        className="flex items-center gap-2"
+                      >
                         <input type="hidden" name="id" value={p.id} />
                         <input
                           name="stock"
@@ -414,7 +374,15 @@ export default function Inventario({ products, company, rates, categories }: Pro
                       )}
                     </td>
                     <td className="p-4">
-                      <form action={toggleProductActive}>
+                      <form
+                        action={async (fd) => {
+                          await toast.promise(toggleProductActive(fd), {
+                            loading: `${p.active ? 'Desactivando' : 'Activando'} ${p.name}…`,
+                            success: `Producto ${p.active ? 'desactivado' : 'activado'}`,
+                            error: 'No se pudo cambiar el estado',
+                          })
+                        }}
+                      >
                         <input type="hidden" name="id" value={p.id} />
                         <input type="hidden" name="next" value={(!p.active).toString()} />
                         <button
@@ -433,15 +401,23 @@ export default function Inventario({ products, company, rates, categories }: Pro
                       <div className="flex justify-end gap-2">
                         <button
                           type="button"
-                          onClick={() => setEditing(p)}
+                          onClick={() => {
+                            toast('Modo edición activado', { icon: '✏️' })
+                            setEditing(p)
+                          }}
                           className="rounded-lg bg-[#8e44ad]/10 px-2.5 py-1.5 text-xs font-semibold text-[#8e44ad] hover:bg-[#8e44ad]/20"
                         >
                           ✏️ Editar
                         </button>
                         <form
-                          action={deleteProduct}
-                          onSubmit={(e) => {
-                            if (!confirm(`¿Eliminar "${p.name}"?`)) e.preventDefault()
+                          action={async (fd) => {
+                            const ok = await confirmToast({ message: `¿Eliminar "${p.name}"?` })
+                            if (!ok) return
+                            await toast.promise(deleteProduct(fd), {
+                              loading: `Eliminando ${p.name}…`,
+                              success: 'Producto eliminado',
+                              error: 'No se pudo eliminar el producto',
+                            })
                           }}
                         >
                           <input type="hidden" name="id" value={p.id} />
@@ -479,6 +455,14 @@ export default function Inventario({ products, company, rates, categories }: Pro
           categories={categories}
           company={company}
           onClose={() => setEditing(null)}
+        />
+      )}
+
+      {showCategoryModal && (
+        <CategoryManagerModal
+          categories={categories}
+          products={products}
+          onClose={() => setShowCategoryModal(false)}
         />
       )}
     </div>

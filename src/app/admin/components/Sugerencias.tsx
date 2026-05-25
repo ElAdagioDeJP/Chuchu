@@ -3,6 +3,7 @@
 import { useRef } from 'react'
 import gsap from 'gsap'
 import { useGSAP } from '@gsap/react'
+import toast from 'react-hot-toast'
 import { createCombo } from '../actions'
 import type { ComboSuggestion } from '@/lib/types'
 import SubmitButton from './SubmitButton'
@@ -14,7 +15,21 @@ export default function Sugerencias({ suggestions }: { suggestions: ComboSuggest
 
   useGSAP(
     () => {
-      gsap.from('.sug-card', { y: 24, opacity: 0, duration: 0.45, stagger: 0.1, ease: 'power3.out' })
+      // fromTo (not from) + clearProps so cards can never get stuck at opacity:0
+      // if the tween is interrupted by a re-render — that left some suggestions
+      // invisible even though the count/badge included them.
+      gsap.fromTo(
+        '.sug-card',
+        { y: 24, opacity: 0 },
+        {
+          y: 0,
+          opacity: 1,
+          duration: 0.45,
+          stagger: 0.1,
+          ease: 'power3.out',
+          clearProps: 'opacity,transform',
+        }
+      )
     },
     { scope: root, dependencies: [suggestions.length] }
   )
@@ -88,7 +103,15 @@ export default function Sugerencias({ suggestions }: { suggestions: ComboSuggest
                   {s.reason}
                 </p>
 
-                <form action={createCombo}>
+                <form
+                  action={async (fd) => {
+                    await toast.promise(createCombo(fd), {
+                      loading: 'Creando combo sugerido…',
+                      success: 'Combo creado desde IA',
+                      error: 'No se pudo crear el combo',
+                    })
+                  }}
+                >
                   <input type="hidden" name="name" value={name} />
                   <input type="hidden" name="priceOffer" value={s.suggestedPrice} />
                   <input type="hidden" name="productIds" value={s.fast.id} />

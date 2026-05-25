@@ -4,10 +4,12 @@ import { useRef, useState } from 'react'
 import Image from 'next/image'
 import gsap from 'gsap'
 import { useGSAP } from '@gsap/react'
+import toast from 'react-hot-toast'
 import { recordSale, toggleComboTv, sellCombo, deleteCombo } from '../actions'
 import type { ComboView, ProductWithVelocity } from '@/lib/types'
 import SubmitButton from './SubmitButton'
 import ComboCreator from './ComboCreator'
+import { confirmToast } from '@/lib/confirmToast'
 
 gsap.registerPlugin(useGSAP)
 
@@ -69,7 +71,16 @@ export default function VentasCombos({ products, combos }: Props) {
                   </div>
                   <p className="text-2xl font-bold text-[#4dd0e1]">${p.price}</p>
                 </div>
-                <form action={recordSale} className="mt-4">
+                <form
+                  action={async (fd) => {
+                    await toast.promise(recordSale(fd), {
+                      loading: `Registrando venta de ${p.name}…`,
+                      success: 'Venta registrada',
+                      error: 'No se pudo registrar la venta',
+                    })
+                  }}
+                  className="mt-4"
+                >
                   <input type="hidden" name="productId" value={p.id} />
                   <SubmitButton
                     pendingText="Vendiendo…"
@@ -185,7 +196,15 @@ export default function VentasCombos({ products, combos }: Props) {
                   <div className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-3">
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-gray-500">📺 TV</span>
-                      <form action={toggleComboTv}>
+                      <form
+                        action={async (fd) => {
+                          await toast.promise(toggleComboTv(fd), {
+                            loading: 'Actualizando visibilidad en TV…',
+                            success: `Combo ${combo.on_tv ? 'oculto' : 'visible'} en TV`,
+                            error: 'No se pudo cambiar el estado en TV',
+                          })
+                        }}
+                      >
                         <input type="hidden" name="id" value={combo.id} />
                         <input type="hidden" name="next" value={(!combo.on_tv).toString()} />
                         <SubmitButton
@@ -211,12 +230,23 @@ export default function VentasCombos({ products, combos }: Props) {
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => setEditing(combo)}
+                        onClick={() => {
+                          toast('Editando combo', { icon: '✏️' })
+                          setEditing(combo)
+                        }}
                         className="rounded-lg bg-[#8e44ad]/10 px-2.5 py-1.5 text-xs font-semibold text-[#8e44ad] hover:bg-[#8e44ad]/20"
                       >
                         ✏️ Editar
                       </button>
-                      <form action={sellCombo}>
+                      <form
+                        action={async (fd) => {
+                          await toast.promise(sellCombo(fd), {
+                            loading: `Vendiendo combo "${combo.name}"…`,
+                            success: 'Combo vendido',
+                            error: 'No se pudo vender el combo',
+                          })
+                        }}
+                      >
                         <input type="hidden" name="comboId" value={combo.id} />
                         <SubmitButton
                           pendingText="…"
@@ -227,9 +257,14 @@ export default function VentasCombos({ products, combos }: Props) {
                         </SubmitButton>
                       </form>
                       <form
-                        action={deleteCombo}
-                        onSubmit={(e) => {
-                          if (!confirm(`¿Eliminar el combo "${combo.name}"?`)) e.preventDefault()
+                        action={async (fd) => {
+                          const ok = await confirmToast({ message: `¿Eliminar el combo "${combo.name}"?` })
+                          if (!ok) return
+                          await toast.promise(deleteCombo(fd), {
+                            loading: `Eliminando combo "${combo.name}"…`,
+                            success: 'Combo eliminado',
+                            error: 'No se pudo eliminar el combo',
+                          })
                         }}
                       >
                         <input type="hidden" name="id" value={combo.id} />

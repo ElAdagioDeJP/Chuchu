@@ -5,7 +5,9 @@ import { useFormStatus } from 'react-dom'
 import Image from 'next/image'
 import gsap from 'gsap'
 import { useGSAP } from '@gsap/react'
+import toast from 'react-hot-toast'
 import { createCompany, toggleCompanyActive, type OwnerActionState } from './actions'
+import { confirmToast } from '@/lib/confirmToast'
 
 gsap.registerPlugin(useGSAP)
 
@@ -239,7 +241,10 @@ export default function OwnerConsole({ companies }: { companies: CompanyRow[] })
                         </a>
                         <button
                           type="button"
-                          onClick={() => navigator.clipboard?.writeText(`${baseUrl}/display/${c.slug}`)}
+                          onClick={() => {
+                            navigator.clipboard?.writeText(`${baseUrl}/display/${c.slug}`)
+                            toast.success('URL copiada')
+                          }}
                           className="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-200"
                         >
                           Copiar URL
@@ -248,12 +253,17 @@ export default function OwnerConsole({ companies }: { companies: CompanyRow[] })
                     </td>
                     <td className="p-4 text-right">
                       <form
-                        action={toggleCompanyActive}
-                        onSubmit={(e) => {
+                        action={async (fd) => {
                           const msg = c.active
                             ? `¿Desactivar "${c.name}"? Su admin no podrá ingresar (los datos se conservan).`
                             : `¿Reactivar "${c.name}"? Su admin podrá ingresar de nuevo.`
-                          if (!confirm(msg)) e.preventDefault()
+                          const ok = await confirmToast({ message: msg })
+                          if (!ok) return
+                          await toast.promise(toggleCompanyActive(fd), {
+                            loading: `${c.active ? 'Desactivando' : 'Activando'} empresa…`,
+                            success: c.active ? 'Empresa desactivada' : 'Empresa reactivada',
+                            error: 'No se pudo actualizar la empresa',
+                          })
                         }}
                       >
                         <input type="hidden" name="companyId" value={c.id} />

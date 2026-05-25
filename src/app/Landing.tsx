@@ -23,7 +23,7 @@ const FEATURES = [
 ]
 
 const STEPS = [
-  { n: '1', title: 'Regístrate', desc: 'Activa tu plan y recibe tu acceso.' },
+  { n: '1', title: 'Regístrate', desc: 'Activa tu prueba gratis por 5 días al instante.' },
   { n: '2', title: 'Carga tu menú', desc: 'Productos, combos y tu logo en minutos.' },
   { n: '3', title: 'Conecta tu TV', desc: 'Abre tu URL en cualquier pantalla y a vender.' },
 ]
@@ -136,6 +136,12 @@ export default function Landing({ rate }: { rate: number }) {
               te dice qué juntar para mover lo que no se vende.
             </p>
             <div className="mt-8 flex flex-wrap gap-4">
+              <Link
+                href="/registro"
+                className="hero-cta rounded-full bg-gradient-to-r from-[#fff176] to-[#f5d13d] px-7 py-3.5 font-bold text-gray-900 shadow-lg shadow-[#fff176]/30 transition-transform hover:scale-105 active:scale-95"
+              >
+                Probar 5 días gratis
+              </Link>
               <a
                 href="#planes"
                 className="hero-cta rounded-full bg-gradient-to-r from-[#d81b60] to-[#8e44ad] px-7 py-3.5 font-bold shadow-lg shadow-[#d81b60]/30 transition-transform hover:scale-105 active:scale-95"
@@ -256,11 +262,12 @@ export default function Landing({ rate }: { rate: number }) {
                 ))}
               </ul>
               <Link
-                href="/pagar?plan=basic"
+                href="/registro"
                 className="mt-8 rounded-full bg-gradient-to-r from-[#d81b60] to-[#8e44ad] py-3.5 text-center font-bold shadow-lg shadow-[#d81b60]/30 transition-transform hover:scale-[1.03] active:scale-95"
               >
-                Comprar ahora
+                Empezar prueba gratis
               </Link>
+              <p className="mt-2 text-center text-xs text-white/50">Luego puedes renovar mensual por $20.</p>
             </div>
 
             {/* Pro — próximamente */}

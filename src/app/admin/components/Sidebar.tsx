@@ -4,6 +4,7 @@ import Image from 'next/image'
 import { logout } from '@/app/login/actions'
 import type { Company } from '@/lib/types'
 import type { Tab } from '../AdminApp'
+import type { AccessInfo } from '@/lib/billing'
 
 export const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'ventas', label: 'Ventas & Combos', icon: '💰' },
@@ -11,6 +12,7 @@ export const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'sugerencias', label: 'Sugerencias IA', icon: '🤖' },
   { id: 'reportes', label: 'Reportes', icon: '📊' },
   { id: 'ajustes', label: 'Ajustes', icon: '⚙️' },
+  { id: 'suscripcion', label: 'Suscripción', icon: '💳' },
 ]
 
 interface Props {
@@ -18,9 +20,12 @@ interface Props {
   setActiveTab: (t: Tab) => void
   company: Company
   suggestionCount: number
+  access: AccessInfo
 }
 
-export default function Sidebar({ activeTab, setActiveTab, company, suggestionCount }: Props) {
+export default function Sidebar({ activeTab, setActiveTab, company, suggestionCount, access }: Props) {
+  const onlySubscription = access.state === 'expired'
+
   return (
     <aside className="fixed left-0 top-0 z-50 hidden h-screen w-[280px] flex-col border-r border-gray-200 bg-white md:flex">
       {/* Co-branding */}
@@ -50,11 +55,12 @@ export default function Sidebar({ activeTab, setActiveTab, company, suggestionCo
             key={item.id}
             type="button"
             onClick={() => setActiveTab(item.id)}
+            disabled={onlySubscription && item.id !== 'suscripcion'}
             className={`mb-2 flex w-full items-center gap-3 rounded-xl px-4 py-3 transition-all ${
               activeTab === item.id
                 ? 'bg-[#f06292] text-white shadow-lg shadow-[#f06292]/30'
                 : 'text-gray-600 hover:bg-gray-100'
-            }`}
+            } ${onlySubscription && item.id !== 'suscripcion' ? 'cursor-not-allowed opacity-35' : ''}`}
           >
             <span className="text-xl">{item.icon}</span>
             <span className="font-medium">{item.label}</span>
@@ -65,6 +71,11 @@ export default function Sidebar({ activeTab, setActiveTab, company, suggestionCo
             )}
           </button>
         ))}
+        {onlySubscription && (
+          <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600">
+            Tu prueba venció. Solo está habilitada la pestaña Suscripción.
+          </p>
+        )}
       </nav>
 
       <div className="border-t border-gray-100 p-4">

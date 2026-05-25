@@ -21,6 +21,9 @@ create table if not exists public.companies (
 alter table public.companies add column if not exists active boolean not null default true;
 alter table public.companies add column if not exists rate_mode text not null default 'binance';
 alter table public.companies add column if not exists custom_rate numeric(12,4);
+-- Subscription: trial runs TRIAL_DAYS from created_at; paid_until extends access
+-- by BILLING_DAYS per validated payment (see src/lib/billing.ts).
+alter table public.companies add column if not exists paid_until timestamptz;
 
 create table if not exists public.categories (
   id          uuid primary key default gen_random_uuid(),
@@ -159,9 +162,10 @@ create policy "combo_items_rw" on public.combo_items
             where c.id = combo_id
               and (c.company_id = public.current_company_id() or public.is_owner())));
 
--- Payments (landing checkout) -------------------------------
+-- Payments (landing checkout + in-app subscription renewals) -
 create table if not exists public.payments (
   id           uuid primary key default gen_random_uuid(),
+  company_id   uuid references public.companies(id) on delete set null, -- null = anonymous landing checkout
   plan         text not null,                       -- 'basic' | 'pro'
   amount_usd   numeric(10,2) not null,
   amount_bs    numeric(14,2),
@@ -176,12 +180,20 @@ create table if not exists public.payments (
   created_at   timestamptz not null default now()
 );
 create index if not exists idx_payments_created on public.payments(created_at desc);
+-- For existing databases:
+alter table public.payments add column if not exists company_id uuid references public.companies(id) on delete set null;
+create index if not exists idx_payments_company on public.payments(company_id);
 
 alter table public.payments enable row level security;
 -- Only the owner can read/update. Inserts happen server-side via service role.
 drop policy if exists "payments_owner_read" on public.payments;
 create policy "payments_owner_read" on public.payments
   for select using (public.is_owner());
+
+-- A tenant admin can read their own company's payments (subscription history).
+drop policy if exists "payments_company_read" on public.payments;
+create policy "payments_company_read" on public.payments
+  for select using (company_id = public.current_company_id());
 drop policy if exists "payments_owner_update" on public.payments;
 create policy "payments_owner_update" on public.payments
   for update using (public.is_owner()) with check (public.is_owner());

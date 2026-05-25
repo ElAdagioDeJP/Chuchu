@@ -4,6 +4,11 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { fetchProductImage } from '@/lib/productImage'
+import { getDolarParalelo, usdToBs } from '@/lib/dolar'
+import { isPaymentProof } from '@/lib/gemini'
+import { sendPaymentTelegram } from '@/lib/telegram'
+import { PLANS, METHOD_LABEL } from '@/lib/plans'
+import type { Plan, PaymentMethod, PaymentStatus } from '@/lib/types'
 
 function parseRate(formData: FormData) {
   const raw = String(formData.get('rate_mode') || '').trim()
@@ -71,6 +76,16 @@ export async function deleteCategory(formData: FormData): Promise<void> {
   const id = String(formData.get('id') || '')
   if (!id) return
   await supabase.from('categories').delete().eq('id', id)
+  revalidatePath('/admin')
+}
+
+/** Assign (or clear, when categoryId is empty) a category on a single product. */
+export async function assignCategory(formData: FormData): Promise<void> {
+  const { supabase } = await ctx()
+  const productId = String(formData.get('productId') || '')
+  if (!productId) return
+  const categoryId = String(formData.get('categoryId') || '').trim() || null
+  await supabase.from('products').update({ category_id: categoryId }).eq('id', productId)
   revalidatePath('/admin')
 }
 
@@ -339,4 +354,122 @@ export async function updateCompany(formData: FormData): Promise<void> {
     await admin.from('companies').update(patch).eq('id', companyId)
   }
   revalidatePath('/admin')
+}
+
+// ---------- Subscription (in-app payment) ----------
+export type SubscriptionState = { error?: string; success?: string }
+
+const PAY_METHODS: PaymentMethod[] = ['binance', 'pagomovil', 'transferencia']
+
+function escapeHtml(s: string) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+/**
+ * A logged-in admin registers a subscription payment for their own company.
+ * Mirrors the landing checkout but ties the payment to company_id so the owner
+ * can validate it and extend the company's paid_until.
+ */
+export async function submitSubscriptionPayment(
+  _prev: SubscriptionState,
+  formData: FormData
+): Promise<SubscriptionState> {
+  const { supabase, companyId } = await ctx()
+
+  const plan = String(formData.get('plan') || 'basic') as Plan
+  const method = String(formData.get('method') || '') as PaymentMethod
+  const reference = String(formData.get('reference') || '').trim()
+  const phone = String(formData.get('phone') || '').trim()
+  const proof = formData.get('proof') as File | null
+
+  if (!PLANS[plan]) return { error: 'Plan inválido.' }
+  if (!PAY_METHODS.includes(method)) return { error: 'Método de pago inválido.' }
+  if (!reference) return { error: 'Indica el número de referencia del pago.' }
+  if (!proof || proof.size === 0) return { error: 'Sube la captura de tu pago.' }
+  if (!proof.type.startsWith('image/')) return { error: 'El comprobante debe ser una imagen.' }
+  if (proof.size > 8 * 1024 * 1024) return { error: 'La imagen es muy grande (máx 8MB).' }
+
+  // Identify the buyer from the company + logged-in user.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  const { data: company } = await supabase
+    .from('companies')
+    .select('name')
+    .eq('id', companyId)
+    .single()
+  const buyerName = (company?.name as string) || 'Empresa'
+  const buyerEmail = user?.email ?? null
+
+  const bytes = await proof.arrayBuffer()
+  const base64 = Buffer.from(bytes).toString('base64')
+
+  const check = await isPaymentProof(base64, proof.type)
+  const status: PaymentStatus = check.ok ? 'pending' : 'rejected'
+
+  const admin = createAdminClient()
+
+  const ext = (proof.name.split('.').pop() || 'jpg').toLowerCase()
+  const path = `${companyId}/sub-${Date.now()}.${ext}`
+  const { error: upErr } = await admin.storage
+    .from('payments')
+    .upload(path, proof, { contentType: proof.type, upsert: true })
+  if (upErr) return { error: `No se pudo subir la imagen: ${upErr.message}` }
+  const proofUrl = admin.storage.from('payments').getPublicUrl(path).data.publicUrl
+
+  const amountUsd = PLANS[plan].priceUsd
+  const rate = await getDolarParalelo()
+  const amountBs = rate > 0 ? usdToBs(amountUsd, rate) : null
+
+  const { error: insErr } = await admin.from('payments').insert({
+    company_id: companyId,
+    plan,
+    amount_usd: amountUsd,
+    amount_bs: amountBs,
+    dolar_rate: rate || null,
+    method,
+    reference,
+    proof_url: proofUrl,
+    buyer_name: buyerName,
+    buyer_email: buyerEmail,
+    buyer_phone: phone || null,
+    status,
+  })
+  if (insErr) return { error: `No se pudo registrar el pago: ${insErr.message}` }
+
+  const bsLine =
+    method === 'binance'
+      ? `💵 Monto: <b>$${amountUsd} USD</b>`
+      : `💵 Monto: <b>$${amountUsd}</b>${amountBs ? ` ≈ <b>Bs ${amountBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</b>` : ''}`
+
+  const caption = [
+    '<b>🔁 RENOVACIÓN DE SUSCRIPCIÓN</b>',
+    '━━━━━━━━━━━━━━━',
+    `🏪 Empresa: <b>${escapeHtml(buyerName)}</b>`,
+    `🏷 Plan: <b>${escapeHtml(PLANS[plan].name)}</b>`,
+    `💳 Método: <b>${METHOD_LABEL[method]}</b>`,
+    bsLine,
+    `🔖 Referencia: <code>${escapeHtml(reference)}</code>`,
+    buyerEmail ? `✉️ ${escapeHtml(buyerEmail)}` : '',
+    phone ? `📱 ${escapeHtml(phone)}` : '',
+    `🕒 ${new Date().toLocaleString('es-VE', { timeZone: 'America/Caracas' })}`,
+    `📌 Estado: <b>${status === 'rejected' ? '❌ RECHAZADO por IA' : '🕓 Pendiente'}</b>`,
+    '',
+    '⚠️ <i>Valida el pago en el panel para sumar 30 días a la empresa.</i>',
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  await sendPaymentTelegram({
+    bytes,
+    filename: `sub-${path.replace(/\//g, '-')}`,
+    mimeType: proof.type,
+    caption,
+  })
+
+  revalidatePath('/admin')
+  return {
+    success:
+      '¡Pago enviado! Lo validaremos pronto y tu cuenta seguirá activa. Gracias por confiar en Chuchu.',
+  }
 }

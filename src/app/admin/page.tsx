@@ -4,7 +4,8 @@ import { getSessionContext } from '@/lib/auth'
 import { logout } from '@/app/login/actions'
 import { suggestCombos, computeProductMeta } from '@/lib/algorithm'
 import { getRates } from '@/lib/rates'
-import type { Category, Product, Sale } from '@/lib/types'
+import { getAccess } from '@/lib/billing'
+import type { Category, Payment, Product, Sale } from '@/lib/types'
 import AdminApp from './AdminApp'
 
 export const dynamic = 'force-dynamic'
@@ -20,7 +21,9 @@ export default async function AdminPage() {
     )
   }
 
-  if (!company.active) {
+  const access = getAccess(company)
+
+  if (access.state === 'disabled') {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[#f8f9fa] p-6 text-center">
         <p className="text-5xl">🚫</p>
@@ -46,6 +49,7 @@ export default async function AdminPage() {
     { data: combosData },
     { data: salesData },
     { data: categoriesData },
+    { data: paymentsData },
   ] = await Promise.all([
     supabase
       .from('products')
@@ -67,11 +71,18 @@ export default async function AdminPage() {
       .select('*')
       .eq('company_id', company.id)
       .order('name', { ascending: true }),
+    supabase
+      .from('payments')
+      .select('*')
+      .eq('company_id', company.id)
+      .order('created_at', { ascending: false })
+      .limit(10),
   ])
 
   const products = (productsData ?? []) as Product[]
   const sales = (salesData ?? []) as Sale[]
   const categories = (categoriesData ?? []) as Category[]
+  const payments = (paymentsData ?? []) as Payment[]
   const rates = await getRates()
 
   const combos = (combosData ?? []).map((c) => {
@@ -154,6 +165,8 @@ export default async function AdminPage() {
         efectoChuchu,
         ventasRegulares: Math.max(0, ventasSemana - efectoChuchu),
       }}
+      access={access}
+      latestPayment={payments[0] ?? null}
     />
   )
 }

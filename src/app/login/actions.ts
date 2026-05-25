@@ -2,6 +2,7 @@
 
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getAccess } from '@/lib/billing'
 
 export async function login(_prev: unknown, formData: FormData) {
   const email = String(formData.get('email') || '').trim()
@@ -35,12 +36,18 @@ export async function login(_prev: unknown, formData: FormData) {
     } else if (profile?.company_id) {
       const { data: company } = await supabase
         .from('companies')
-        .select('active')
+        .select('active, created_at, paid_until')
         .eq('id', profile.company_id)
         .single()
-      if (company && company.active === false) {
+      if (company) {
+        const access = getAccess(company)
+        if (access.state === 'disabled') {
+          await supabase.auth.signOut()
+          return { error: 'Esta cuenta está desactivada. Contacta al propietario.' }
+        }
+      } else {
         await supabase.auth.signOut()
-        return { error: 'Esta cuenta está desactivada. Contacta al propietario.' }
+        return { error: 'No encontramos la empresa de este usuario.' }
       }
     }
   }
