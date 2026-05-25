@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useEffect, useMemo, useState } from 'react'
+import { useActionState, useEffect, useMemo, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { ACCOUNTS, METHOD_LABEL, PLANS } from '@/lib/plans'
 import { usdToBs } from '@/lib/dolar'
@@ -12,11 +12,38 @@ import SubmitButton from './SubmitButton'
 
 const METHODS: PaymentMethod[] = ['binance', 'pagomovil', 'transferencia']
 
-function DataRow({ label, value }: { label: string; value: string }) {
+function DataRow({
+  label,
+  value,
+  onCopy,
+  copied,
+}: {
+  label: string
+  value: string
+  onCopy?: () => void
+  copied?: boolean
+}) {
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-gray-100 py-1.5 text-sm last:border-0">
-      <span className="text-gray-500">{label}</span>
-      <span className="font-semibold text-gray-800">{value}</span>
+    <div className="flex items-start justify-between gap-2 border-b border-gray-100 py-1.5 text-sm last:border-0">
+      <span className="min-w-0 text-gray-500">{label}</span>
+      <div className="flex min-w-0 items-center gap-1.5">
+        <span className="break-all text-right font-semibold text-gray-800">{value}</span>
+        {onCopy && (
+          <button
+            type="button"
+            onClick={onCopy}
+            className={`rounded-md border px-1.5 py-1 text-[11px] leading-none transition ${
+              copied
+                ? 'border-green-200 bg-green-50 text-green-600'
+                : 'border-gray-200 text-gray-500 hover:border-[#f06292] hover:text-[#d81b60]'
+            }`}
+            aria-label={`Copiar ${label}`}
+            title={`Copiar ${label}`}
+          >
+            {copied ? '✅' : '📋'}
+          </button>
+        )}
+      </div>
     </div>
   )
 }
@@ -43,6 +70,8 @@ export default function Suscripcion({
 }) {
   const [method, setMethod] = useState<PaymentMethod>('binance')
   const [proofName, setProofName] = useState<string | null>(null)
+  const [copiedKey, setCopiedKey] = useState<string | null>(null)
+  const copyTimerRef = useRef<number | null>(null)
   const [state, formAction] = useActionState(submitSubscriptionPayment, {} as SubscriptionState)
   const monthlyUsd = PLANS.basic.priceUsd
   const monthlyBs = rates.binance > 0 ? usdToBs(monthlyUsd, rates.binance) : 0
@@ -51,6 +80,14 @@ export default function Suscripcion({
     if (state.success) toast.success(state.success)
     if (state.error) toast.error(state.error)
   }, [state.error, state.success])
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) {
+        window.clearTimeout(copyTimerRef.current)
+      }
+    }
+  }, [])
 
   const statusMeta = useMemo(() => {
     if (access.state === 'paid') {
@@ -85,8 +122,42 @@ export default function Suscripcion({
     }
   }, [access.daysLeft, access.paidUntil, access.state, access.trialEnd])
 
+  const paymentRows = useMemo(() => {
+    if (method === 'binance') {
+      return [{ label: 'Correo', value: ACCOUNTS.binance.email }]
+    }
+    if (method === 'pagomovil') {
+      return [
+        { label: 'Telefono', value: ACCOUNTS.pagomovil.phone },
+        { label: 'Banco', value: ACCOUNTS.pagomovil.bank },
+        { label: 'Cedula', value: ACCOUNTS.pagomovil.ci },
+      ]
+    }
+    return [
+      { label: 'Banco', value: ACCOUNTS.transferencia.bank },
+      { label: ACCOUNTS.transferencia.rif, value: ACCOUNTS.transferencia.holder },
+      { label: 'Tipo', value: ACCOUNTS.transferencia.accountType },
+      { label: 'Cuenta', value: ACCOUNTS.transferencia.account },
+      { label: 'Documento', value: ACCOUNTS.transferencia.ci },
+    ]
+  }, [method])
+
+  const copyText = async (value: string, label: string, key: string) => {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopiedKey(key)
+      if (copyTimerRef.current) {
+        window.clearTimeout(copyTimerRef.current)
+      }
+      copyTimerRef.current = window.setTimeout(() => setCopiedKey(null), 500)
+      toast.success(`${label} copiado`)
+    } catch {
+      toast.error('No se pudo copiar el dato')
+    }
+  }
+
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-4xl space-y-6 overflow-x-hidden">
       <div>
         <h1 className="text-2xl font-bold text-gray-800">💳 Suscripción</h1>
         <p className="text-gray-500">Controla tu prueba, vigencia y renovaciones mensuales.</p>
@@ -113,13 +184,13 @@ export default function Suscripcion({
             <input type="hidden" name="plan" value="basic" />
             <input type="hidden" name="method" value={method} />
 
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-3">
               {METHODS.map((m) => (
                 <button
                   key={m}
                   type="button"
                   onClick={() => setMethod(m)}
-                  className={`rounded-lg border px-2 py-2 text-xs font-semibold transition ${
+                  className={`rounded-lg border px-2 py-2 text-sm font-semibold transition ${
                     method === m
                       ? 'border-[#f06292] bg-[#f06292]/10 text-[#d81b60]'
                       : 'border-gray-200 text-gray-500 hover:bg-gray-50'
@@ -132,37 +203,44 @@ export default function Suscripcion({
 
             <div className="rounded-xl border border-[#f06292]/30 bg-[#f06292]/5 p-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-[#d81b60]">Monto a pagar</p>
-              <p className="mt-1 text-lg font-extrabold text-gray-900">${monthlyUsd} USD</p>
+              <div className="mt-1 flex items-center justify-between gap-2">
+                <p className="text-lg font-extrabold text-gray-900">${monthlyUsd} USD</p>
+                <button
+                  type="button"
+                  onClick={() => copyText(`${monthlyUsd} USD`, 'Monto en USD', 'amount-usd')}
+                  className={`rounded-md border px-2 py-1 text-xs font-semibold transition ${
+                    copiedKey === 'amount-usd'
+                      ? 'border-green-200 bg-green-50 text-green-700'
+                      : 'border-[#f06292]/30 bg-white/80 text-[#d81b60] hover:bg-white'
+                  }`}
+                >
+                  {copiedKey === 'amount-usd' ? 'Copiado ✅' : 'Copiar 📋'}
+                </button>
+              </div>
               {monthlyBs > 0 && (
-                <p className="text-sm text-gray-600">
-                  Aproximado en Bs: <b>Bs {monthlyBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</b> (tasa Binance {rates.binance.toFixed(2)})
-                </p>
+                <div className="mt-1 flex flex-wrap items-center justify-between gap-2 text-sm text-gray-600">
+                  <p className="min-w-0 break-words">
+                    Aproximado en Bs: <b>Bs {monthlyBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</b> (tasa Binance {rates.binance.toFixed(2)})
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      copyText(
+                        `Bs ${monthlyBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}`,
+                        'Monto en Bs',
+                        'amount-bs'
+                      )
+                    }
+                    className={`rounded-md border px-2 py-1 text-xs font-semibold transition ${
+                      copiedKey === 'amount-bs'
+                        ? 'border-green-200 bg-green-50 text-green-700'
+                        : 'border-[#f06292]/30 bg-white/80 text-[#d81b60] hover:bg-white'
+                    }`}
+                  >
+                    {copiedKey === 'amount-bs' ? 'Copiado ✅' : 'Copiar 📋'}
+                  </button>
+                </div>
               )}
-            </div>
-
-            <div className="space-y-2 rounded-xl border border-gray-200 bg-gray-50 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">Datos de pago (todos los metodos)</p>
-
-              <div className="rounded-lg bg-white p-3">
-                <p className="mb-1 text-xs font-bold text-[#8e44ad]">Binance (USDT)</p>
-                <DataRow label="Correo" value={ACCOUNTS.binance.email} />
-              </div>
-
-              <div className="rounded-lg bg-white p-3">
-                <p className="mb-1 text-xs font-bold text-[#8e44ad]">Pago Movil</p>
-                <DataRow label="Telefono" value={ACCOUNTS.pagomovil.phone} />
-                <DataRow label="Banco" value={ACCOUNTS.pagomovil.bank} />
-                <DataRow label="Cedula" value={ACCOUNTS.pagomovil.ci} />
-              </div>
-
-              <div className="rounded-lg bg-white p-3">
-                <p className="mb-1 text-xs font-bold text-[#8e44ad]">Transferencia</p>
-                <DataRow label="Banco" value={ACCOUNTS.transferencia.bank} />
-                <DataRow label={ACCOUNTS.transferencia.rif} value={ACCOUNTS.transferencia.holder} />
-                <DataRow label="Tipo" value={ACCOUNTS.transferencia.accountType} />
-                <DataRow label="Cuenta" value={ACCOUNTS.transferencia.account} />
-                <DataRow label="Documento" value={ACCOUNTS.transferencia.ci} />
-              </div>
             </div>
 
             <input
@@ -212,7 +290,8 @@ export default function Suscripcion({
           <h2 className="mb-3 font-bold text-gray-800">Estado de cuenta</h2>
           <div className="space-y-2 text-sm text-gray-600">
             <p>
-              <strong className="text-gray-800">Empresa:</strong> {company.name}
+              <strong className="text-gray-800">Empresa:</strong>{' '}
+              <span className="break-words">{company.name}</span>
             </p>
             <p>
               <strong className="text-gray-800">Prueba gratis:</strong> 5 días desde el registro
@@ -226,6 +305,25 @@ export default function Suscripcion({
               {latestPayment ? `${fmtDate(latestPayment.created_at)} (${latestPayment.status})` : 'Sin pagos aún'}
             </p>
           </div>
+
+          <div className="mt-4 space-y-2 rounded-xl border border-gray-200 bg-gray-50 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">
+              Datos de pago ({METHOD_LABEL[method]})
+            </p>
+            <div className="rounded-lg bg-white p-3">
+              <p className="mb-1 text-xs font-bold text-[#8e44ad]">{METHOD_LABEL[method]}</p>
+              {paymentRows.map((row) => (
+                <DataRow
+                  key={`${method}-${row.label}`}
+                  label={row.label}
+                  value={row.value}
+                  copied={copiedKey === `${method}-${row.label}`}
+                  onCopy={() => copyText(row.value, row.label, `${method}-${row.label}`)}
+                />
+              ))}
+            </div>
+          </div>
+
           <p className="mt-4 rounded-lg bg-gray-50 p-3 text-xs text-gray-500">
             Cuando tu pago sea validado por el owner, Chuchu extiende tu vigencia automáticamente por 30 días.
           </p>

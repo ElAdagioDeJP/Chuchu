@@ -11,7 +11,7 @@ export default function RegistroPage() {
   const [state, formAction] = useActionState(registerTrial, {} as RegisterState)
 
   return (
-    <div className="min-h-screen bg-[#f6f2fb] px-4 py-4 text-gray-900 md:px-6 md:py-8">
+    <div className="min-h-screen overflow-x-hidden bg-[#f6f2fb] px-4 py-4 text-gray-900 md:px-6 md:py-8">
       <div className="mx-auto max-w-6xl overflow-hidden rounded-3xl border border-[#e6dff2] bg-white shadow-[0_18px_60px_rgba(62,14,98,0.18)]">
         <div className="grid lg:grid-cols-[1.05fr_1fr]">
           <section className="relative overflow-hidden bg-[#1a1024] p-6 text-white md:p-8 lg:p-10">
@@ -36,7 +36,7 @@ export default function RegistroPage() {
               <h1 className="mt-4 text-3xl font-black leading-tight tracking-tight md:text-4xl">
                 Prueba gratis 5 dias
               </h1>
-              <p className="mt-3 max-w-md text-sm text-white/75 md:text-base">
+              <p className="mt-3 max-w-md break-words text-sm text-white/75 md:text-base">
                 Mismo look de la landing, pero enfocado en registro rapido: creas tu cuenta, entras al panel y empiezas a vender.
               </p>
 
@@ -101,7 +101,7 @@ export default function RegistroPage() {
                 </label>
               </div>
 
-              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 [overflow-wrap:anywhere]">
                 Cada red (IP) solo puede activar una prueba gratis. Si tu prueba ya vencio, debes renovar tu suscripcion.
               </div>
 
