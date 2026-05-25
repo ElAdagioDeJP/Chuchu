@@ -215,7 +215,9 @@ export async function createCombo(formData: FormData): Promise<void> {
   const name = String(formData.get('name') || '').trim()
   const priceOffer = Number(formData.get('priceOffer') || 0)
   const productIds = formData.getAll('productIds').map(String).filter(Boolean)
-  if (!name || productIds.length < 2 || !priceOffer) return
+  if (!name || productIds.length < 2 || !priceOffer) {
+    throw new Error('Datos del combo incompletos: nombre, 2+ productos y precio oferta.')
+  }
 
   const { data: prods } = await supabase
     .from('products')
@@ -223,7 +225,7 @@ export async function createCombo(formData: FormData): Promise<void> {
     .in('id', productIds)
   const originalPrice = (prods ?? []).reduce((t, p) => t + Number(p.price), 0)
 
-  const { data: combo } = await supabase
+  const { data: combo, error: comboErr } = await supabase
     .from('combos')
     .insert({
       company_id: companyId,
@@ -233,11 +235,16 @@ export async function createCombo(formData: FormData): Promise<void> {
     })
     .select()
     .single()
-  if (!combo) return
+  if (comboErr || !combo) {
+    throw new Error(comboErr?.message || 'No se pudo crear el combo.')
+  }
 
-  await supabase
+  const { error: itemsErr } = await supabase
     .from('combo_items')
     .insert(productIds.map((pid) => ({ combo_id: combo.id, product_id: pid })))
+  if (itemsErr) {
+    throw new Error(itemsErr.message)
+  }
   revalidatePath('/admin')
 }
 
@@ -247,7 +254,9 @@ export async function updateCombo(formData: FormData): Promise<void> {
   const name = String(formData.get('name') || '').trim()
   const priceOffer = Number(formData.get('priceOffer') || 0)
   const productIds = formData.getAll('productIds').map(String).filter(Boolean)
-  if (!id || !name || productIds.length < 2 || !priceOffer) return
+  if (!id || !name || productIds.length < 2 || !priceOffer) {
+    throw new Error('Datos del combo incompletos: nombre, 2+ productos y precio oferta.')
+  }
 
   const { data: prods } = await supabase
     .from('products')
@@ -255,14 +264,16 @@ export async function updateCombo(formData: FormData): Promise<void> {
     .in('id', productIds)
   const originalPrice = (prods ?? []).reduce((t, p) => t + Number(p.price), 0)
 
-  await supabase
+  const { error: updErr } = await supabase
     .from('combos')
     .update({ name, price_offer: priceOffer, original_price: originalPrice })
     .eq('id', id)
+  if (updErr) throw new Error(updErr.message)
   await supabase.from('combo_items').delete().eq('combo_id', id)
-  await supabase
+  const { error: itemsErr } = await supabase
     .from('combo_items')
     .insert(productIds.map((pid) => ({ combo_id: id, product_id: pid })))
+  if (itemsErr) throw new Error(itemsErr.message)
   revalidatePath('/admin')
 }
 

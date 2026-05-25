@@ -34,10 +34,18 @@ export default function ComboCreator({
   const [price, setPrice] = useState(presetPrice ? String(presetPrice) : '')
   const [search, setSearch] = useState('')
   const root = useRef<HTMLDivElement>(null)
+  const nameInput = useRef<HTMLInputElement>(null)
 
   useGSAP(
     () => {
-      gsap.from('.cc-panel', { y: 24, scale: 0.96, opacity: 0, duration: 0.3, ease: 'back.out(1.4)' })
+      gsap.from('.cc-panel', {
+        y: 24,
+        scale: 0.96,
+        opacity: 0,
+        duration: 0.3,
+        ease: 'back.out(1.4)',
+        onComplete: () => nameInput.current?.focus(),
+      })
     },
     { scope: root }
   )
@@ -111,6 +119,8 @@ export default function ComboCreator({
           className="flex min-h-0 flex-1 flex-col"
         >
           {editId && <input type="hidden" name="id" value={editId} />}
+          <input type="hidden" name="name" value={name} />
+          <input type="hidden" name="priceOffer" value={offer || ''} />
           {selected.map((id) => (
             <input key={id} type="hidden" name="productIds" value={id} />
           ))}
@@ -166,6 +176,7 @@ export default function ComboCreator({
             <div className="flex flex-col">
               <label className="mb-1 block text-sm font-semibold text-gray-700">2. Tu combo</label>
               <input
+                ref={nameInput}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Nombre del combo (ej: Antojo Total)"
