@@ -252,7 +252,7 @@ export default function Checkout({ plan, rate }: { plan: Plan; rate: number }) {
 
           <PayButton />
           <p className="text-center text-xs text-white/40">
-            La IA valida tipo de pago y monto. Si no coincide con el metodo seleccionado, no se enviara.
+            La IA hace una pre-revision del comprobante y envia alertas al owner para validacion final.
           </p>
         </form>
       </div>

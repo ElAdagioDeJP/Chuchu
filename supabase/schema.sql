@@ -192,6 +192,7 @@ create table if not exists public.payments (
   ai_reason    text,
   ai_method_match boolean,
   ai_amount_match boolean,
+  ai_alert_level text,                            -- 'ok' | 'review'
   method       text not null,                       -- 'binance' | 'pagomovil' | 'transferencia'
   reference    text,
   proof_url    text,
@@ -214,6 +215,7 @@ alter table public.payments add column if not exists ai_currency text;
 alter table public.payments add column if not exists ai_reason text;
 alter table public.payments add column if not exists ai_method_match boolean;
 alter table public.payments add column if not exists ai_amount_match boolean;
+alter table public.payments add column if not exists ai_alert_level text;
 create index if not exists idx_payments_company on public.payments(company_id);
 
 alter table public.trial_ip_claims enable row level security;

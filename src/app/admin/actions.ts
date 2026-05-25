@@ -6,7 +6,12 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { fetchProductImage } from '@/lib/productImage'
 import { getDolarParalelo, usdToBs } from '@/lib/dolar'
 import { isPaymentProof } from '@/lib/gemini'
-import { parseMoneyInput, validatePaymentProof } from '@/lib/payment-validation'
+import {
+  getOwnerAlertLevel,
+  getOwnerAlertText,
+  parseMoneyInput,
+  validatePaymentProof,
+} from '@/lib/payment-validation'
 import { sendPaymentTelegram } from '@/lib/telegram'
 import { PLANS, METHOD_LABEL } from '@/lib/plans'
 import type { Plan, PaymentMethod } from '@/lib/types'
@@ -420,10 +425,8 @@ export async function submitSubscriptionPayment(
     declaredAmount: paidAmount,
     analysis: check,
   })
-
-  if (!validation.valid) {
-    return { error: validation.userMessage }
-  }
+  const ownerAlertLevel = getOwnerAlertLevel(validation)
+  const ownerAlertText = getOwnerAlertText(ownerAlertLevel)
 
   const admin = createAdminClient()
 
@@ -451,6 +454,7 @@ export async function submitSubscriptionPayment(
     ai_reason: check.reason || null,
     ai_method_match: validation.checks.methodMatch,
     ai_amount_match: validation.checks.imageAmountMatch,
+    ai_alert_level: ownerAlertLevel,
     method,
     reference,
     proof_url: proofUrl,
@@ -484,6 +488,7 @@ export async function submitSubscriptionPayment(
     phone ? `📱 ${escapeHtml(phone)}` : '',
     `🕒 ${new Date().toLocaleString('es-VE', { timeZone: 'America/Caracas' })}`,
     `🤖 IA: <b>${escapeHtml(check.method)}</b>${check.amount ? ` · ${check.currency} ${check.amount}` : ''}`,
+    `🚦 Alerta IA: <b>${escapeHtml(ownerAlertText)}</b>`,
     check.reason ? `🧠 Nota IA: ${escapeHtml(check.reason)}` : '',
     '📌 Estado: <b>🕓 Pendiente</b>',
     '',
@@ -502,6 +507,6 @@ export async function submitSubscriptionPayment(
   revalidatePath('/admin')
   return {
     success:
-      '¡Pago enviado! Lo validaremos pronto y tu cuenta seguirá activa. Gracias por confiar en Chuchu.',
+      '¡Pago enviado! El owner lo revisara para validar tu renovacion. Gracias por confiar en Chuchu.',
   }
 }

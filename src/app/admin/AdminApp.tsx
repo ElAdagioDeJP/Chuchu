@@ -90,7 +90,14 @@ export default function AdminApp({
       case 'ajustes':
         return <Ajustes company={company} />
       case 'suscripcion':
-        return <Suscripcion company={company} access={access} latestPayment={latestPayment} />
+        return (
+          <Suscripcion
+            company={company}
+            access={access}
+            latestPayment={latestPayment}
+            rates={rates}
+          />
+        )
       default:
         return null
     }

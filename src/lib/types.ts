@@ -27,6 +27,7 @@ export interface Payment {
   ai_reason: string | null
   ai_method_match: boolean | null
   ai_amount_match: boolean | null
+  ai_alert_level: 'ok' | 'review' | null
   method: PaymentMethod
   reference: string | null
   proof_url: string | null

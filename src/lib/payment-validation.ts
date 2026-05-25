@@ -23,6 +23,8 @@ export interface ProofValidationResult {
   }
 }
 
+export type OwnerAlertLevel = 'ok' | 'review'
+
 function tolerance(expected: number, currency: Currency): number {
   if (currency === 'USD') {
     return Math.max(1, expected * 0.03)
@@ -140,4 +142,18 @@ export function validatePaymentProof(input: ProofValidationInput): ProofValidati
       imageAmountMatch,
     },
   }
+}
+
+export function getOwnerAlertLevel(result: ProofValidationResult): OwnerAlertLevel {
+  if (!result.checks.looksLikePayment) return 'review'
+  if (!result.checks.methodMatch) return 'review'
+  if (!result.checks.declaredAmountMatch) return 'review'
+  if (result.checks.imageAmountMatch === false) return 'review'
+  return 'ok'
+}
+
+export function getOwnerAlertText(level: OwnerAlertLevel): string {
+  return level === 'ok'
+    ? '✅ Parece un pago real'
+    : '⚠️ No es 100% valido, revisar manualmente'
 }

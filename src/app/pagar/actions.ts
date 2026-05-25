@@ -3,7 +3,12 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getDolarParalelo, usdToBs } from '@/lib/dolar'
 import { isPaymentProof } from '@/lib/gemini'
-import { parseMoneyInput, validatePaymentProof } from '@/lib/payment-validation'
+import {
+  getOwnerAlertLevel,
+  getOwnerAlertText,
+  parseMoneyInput,
+  validatePaymentProof,
+} from '@/lib/payment-validation'
 import { sendPaymentTelegram } from '@/lib/telegram'
 import { PLANS, METHOD_LABEL } from '@/lib/plans'
 import type { Plan, PaymentMethod } from '@/lib/types'
@@ -55,10 +60,8 @@ export async function submitPayment(
     declaredAmount: paidAmount,
     analysis: check,
   })
-
-  if (!validation.valid) {
-    return { error: validation.userMessage }
-  }
+  const ownerAlertLevel = getOwnerAlertLevel(validation)
+  const ownerAlertText = getOwnerAlertText(ownerAlertLevel)
 
   const admin = createAdminClient()
 
@@ -87,6 +90,7 @@ export async function submitPayment(
     ai_reason: check.reason || null,
     ai_method_match: validation.checks.methodMatch,
     ai_amount_match: validation.checks.imageAmountMatch,
+    ai_alert_level: ownerAlertLevel,
     method,
     reference,
     proof_url: proofUrl,
@@ -122,6 +126,7 @@ export async function submitPayment(
     phone ? `   • 📱 ${esc(phone)}` : '',
     `🕒 ${new Date().toLocaleString('es-VE', { timeZone: 'America/Caracas' })}`,
     `🤖 IA: <b>${esc(check.method)}</b>${check.amount ? ` · ${check.currency} ${check.amount}` : ''}`,
+    `🚦 Alerta IA: <b>${esc(ownerAlertText)}</b>`,
     check.reason ? `🧠 Nota IA: ${esc(check.reason)}` : '',
     '📌 Estado: <b>🕓 Pendiente</b>',
     '',
@@ -139,6 +144,6 @@ export async function submitPayment(
 
   return {
     success:
-      '¡Pago enviado! Validaremos tu comprobante y activaremos tu cuenta muy pronto. Te contactaremos por correo.',
+      '¡Pago enviado! Tu comprobante fue recibido y sera revisado por el owner para activar tu cuenta.',
   }
 }

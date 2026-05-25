@@ -2,13 +2,24 @@
 
 import { useActionState, useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
-import { METHOD_LABEL } from '@/lib/plans'
+import { ACCOUNTS, METHOD_LABEL, PLANS } from '@/lib/plans'
+import { usdToBs } from '@/lib/dolar'
 import type { Company, Payment, PaymentMethod } from '@/lib/types'
+import type { Rates } from '@/lib/rates'
 import type { AccessInfo } from '@/lib/billing'
 import { submitSubscriptionPayment, type SubscriptionState } from '../actions'
 import SubmitButton from './SubmitButton'
 
 const METHODS: PaymentMethod[] = ['binance', 'pagomovil', 'transferencia']
+
+function DataRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-gray-100 py-1.5 text-sm last:border-0">
+      <span className="text-gray-500">{label}</span>
+      <span className="font-semibold text-gray-800">{value}</span>
+    </div>
+  )
+}
 
 function fmtDate(input: string | number | null) {
   if (!input) return '—'
@@ -23,14 +34,18 @@ export default function Suscripcion({
   company,
   access,
   latestPayment,
+  rates,
 }: {
   company: Company
   access: AccessInfo
   latestPayment: Payment | null
+  rates: Rates
 }) {
   const [method, setMethod] = useState<PaymentMethod>('binance')
   const [proofName, setProofName] = useState<string | null>(null)
   const [state, formAction] = useActionState(submitSubscriptionPayment, {} as SubscriptionState)
+  const monthlyUsd = PLANS.basic.priceUsd
+  const monthlyBs = rates.binance > 0 ? usdToBs(monthlyUsd, rates.binance) : 0
 
   useEffect(() => {
     if (state.success) toast.success(state.success)
@@ -112,7 +127,42 @@ export default function Suscripcion({
                 >
                   {METHOD_LABEL[m]}
                 </button>
-              ))}
+                ))}
+              </div>
+
+            <div className="rounded-xl border border-[#f06292]/30 bg-[#f06292]/5 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#d81b60]">Monto a pagar</p>
+              <p className="mt-1 text-lg font-extrabold text-gray-900">${monthlyUsd} USD</p>
+              {monthlyBs > 0 && (
+                <p className="text-sm text-gray-600">
+                  Aproximado en Bs: <b>Bs {monthlyBs.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</b> (tasa Binance {rates.binance.toFixed(2)})
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2 rounded-xl border border-gray-200 bg-gray-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">Datos de pago (todos los metodos)</p>
+
+              <div className="rounded-lg bg-white p-3">
+                <p className="mb-1 text-xs font-bold text-[#8e44ad]">Binance (USDT)</p>
+                <DataRow label="Correo" value={ACCOUNTS.binance.email} />
+              </div>
+
+              <div className="rounded-lg bg-white p-3">
+                <p className="mb-1 text-xs font-bold text-[#8e44ad]">Pago Movil</p>
+                <DataRow label="Telefono" value={ACCOUNTS.pagomovil.phone} />
+                <DataRow label="Banco" value={ACCOUNTS.pagomovil.bank} />
+                <DataRow label="Cedula" value={ACCOUNTS.pagomovil.ci} />
+              </div>
+
+              <div className="rounded-lg bg-white p-3">
+                <p className="mb-1 text-xs font-bold text-[#8e44ad]">Transferencia</p>
+                <DataRow label="Banco" value={ACCOUNTS.transferencia.bank} />
+                <DataRow label={ACCOUNTS.transferencia.rif} value={ACCOUNTS.transferencia.holder} />
+                <DataRow label="Tipo" value={ACCOUNTS.transferencia.accountType} />
+                <DataRow label="Cuenta" value={ACCOUNTS.transferencia.account} />
+                <DataRow label="Documento" value={ACCOUNTS.transferencia.ci} />
+              </div>
             </div>
 
             <input
@@ -134,7 +184,7 @@ export default function Suscripcion({
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#f06292]"
             />
             <p className="text-xs text-gray-500">
-              El monto debe ser muy cercano al valor del plan segun la tasa actual. Si no coincide, el comprobante se rechaza automaticamente.
+              El monto debe ser cercano al valor esperado. La IA solo deja una alerta para que el owner revise manualmente.
             </p>
             <label className="flex cursor-pointer items-center gap-2 rounded-lg border-2 border-dashed border-gray-300 px-3 py-2 text-sm text-gray-600 hover:border-[#f06292]">
               <span>📷</span>

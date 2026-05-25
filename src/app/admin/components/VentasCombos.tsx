@@ -48,10 +48,35 @@ export default function VentasCombos({ products, combos }: Props) {
 
   useGSAP(
     () => {
-      gsap.from('.vc-product', { y: 20, opacity: 0, duration: 0.4, stagger: 0.05, ease: 'power2.out' })
-      gsap.from('.vc-combo', { x: -20, opacity: 0, duration: 0.4, stagger: 0.08, delay: 0.15, ease: 'power2.out' })
+      const productCards = gsap.utils.toArray<HTMLElement>('.vc-product')
+      const comboCards = gsap.utils.toArray<HTMLElement>('.vc-combo')
+
+      if (productCards.length > 0) {
+        gsap.from(productCards, {
+          y: 20,
+          opacity: 0,
+          duration: 0.4,
+          stagger: 0.05,
+          ease: 'power2.out',
+          overwrite: 'auto',
+          clearProps: 'opacity,transform',
+        })
+      }
+
+      if (comboCards.length > 0) {
+        gsap.from(comboCards, {
+          x: -20,
+          opacity: 0,
+          duration: 0.4,
+          stagger: 0.08,
+          delay: 0.15,
+          ease: 'power2.out',
+          overwrite: 'auto',
+          clearProps: 'opacity,transform',
+        })
+      }
     },
-    { scope: root, dependencies: [filteredActiveProducts.length, filteredCombos.length] }
+    { scope: root, dependencies: [activeProducts.length, combos.length] }
   )
 
   return (

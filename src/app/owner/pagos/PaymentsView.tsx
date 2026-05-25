@@ -133,6 +133,16 @@ export default function PaymentsView({ payments }: { payments: Payment[] }) {
                           </p>
                         )}
                         {p.ai_reason && <p className="text-xs text-amber-600">{p.ai_reason}</p>}
+                        {p.ai_alert_level === 'review' && (
+                          <p className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+                            IA: revisar
+                          </p>
+                        )}
+                        {p.ai_alert_level === 'ok' && (
+                          <p className="mt-1 inline-flex rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700">
+                            IA: parece valido
+                          </p>
+                        )}
                       </td>
                       <td className="p-3">
                         <code className="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700">

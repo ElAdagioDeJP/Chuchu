@@ -18,9 +18,20 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="login-cta mt-2 w-full rounded-xl bg-gradient-to-r from-[#d81b60] to-[#8e44ad] py-3 font-bold text-white shadow-lg shadow-[#d81b60]/30 transition-transform hover:scale-[1.02] active:scale-95 disabled:opacity-60"
+      className="login-cta mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#d81b60] to-[#8e44ad] py-3 font-bold text-white shadow-lg shadow-[#d81b60]/30 transition-transform hover:scale-[1.02] active:scale-95 disabled:cursor-not-allowed disabled:opacity-70"
+      aria-busy={pending}
     >
-      {pending ? 'Entrando…' : 'Ingresar'}
+      {pending ? (
+        <>
+          <span
+            className="h-4 w-4 animate-spin rounded-full border-2 border-white/50 border-t-white"
+            aria-hidden="true"
+          />
+          Entrando...
+        </>
+      ) : (
+        'Ingresar'
+      )}
     </button>
   )
 }
